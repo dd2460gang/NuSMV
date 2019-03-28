@@ -1,0 +1,36 @@
+MODULE main
+VAR
+  gas: boolean;
+  brake: boolean;
+  state:   { still, rolling, speeding, crash};
+
+ASSIGN
+  init (state) := still;
+  next (state) := case
+		state = still & gas:		rolling;
+		state = rolling & brake:	still;
+		state = rolling & gas:		speeding;
+		state = speeding & brake:	rolling;
+		state = speeding & gas = TRUE:	crash;
+		TRUE:				state; 
+  esac;
+
+  init (gas) := FALSE;
+  init (brake) := FALSE;
+  --next (gas) := (gas & !brake);
+
+
+LTLSPEC
+  G(!(state = still)); 
+
+LTLSPEC
+  G(!(state = rolling));
+
+LTLSPEC
+  G(!(state = speeding));
+
+LTLSPEC
+  G( F (state = still));
+
+LTLSPEC
+  G( (state=crash) -> X(state = still))

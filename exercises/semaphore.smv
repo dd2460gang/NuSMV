@@ -1,0 +1,93 @@
+MODULE user(semaphore, active)
+VAR
+  state : { idle, entering, critical, exiting };
+ASSIGN
+  init(state) := idle;
+  
+  next(state) := case
+    !active: idle;
+    state = idle : { idle, entering };
+    state = entering & !semaphore : critical;
+    state = critical : { critical, exiting };
+    state = exiting : idle;
+    TRUE : state;
+  esac;
+  
+--FAIRNESS
+--  running
+
+MODULE main
+VAR
+  running: 0..1;
+  semaphore : boolean;
+  proc1 : user(semaphore, next(running) = 0);
+  proc2 : user(semaphore, next(running) = 1);
+ASSIGN
+  init(semaphore) := FALSE;
+  
+  next(proc1) := case
+    running = 0: next(proc1);
+    TRUE : proc1;
+  esac;
+  
+  next(proc2) := case
+    running = 1: next(proc2);
+    TRUE : proc2;
+  esac;
+  
+  next(semaphore) := case
+    proc1.state = entering | proc2.state = entering: TRUE;
+    proc1.state = exiting | proc2.state = exiting: FALSE;
+    TRUE : semaphore;
+  esac;
+  
+  next(running) := case
+    TRUE: {1,0};
+  esac;
+  
+SPEC AG !(proc1.state = critical & proc2.state = critical); -- safety
+
+SPEC AG (proc1.state = entering -> AF proc1.state = critical); -- liveness
+
+-- Trace Description: CTL Counterexample
+-- Trace Type: Counterexample
+--   -> State: 1.1 <-
+--     semaphore = FALSE
+--     proc1.state = idle
+--     proc2.state = idle
+--   -> Input: 1.2 <-
+--     _process_selector_ = proc1
+--     running = FALSE
+--     proc2.running = FALSE
+--     proc1.running = TRUE
+--   -- Loop starts here
+--   -> State: 1.2 <-
+--     proc1.state = entering
+--   -> Input: 1.3 <-
+--     _process_selector_ = proc2
+--     proc2.running = TRUE
+--     proc1.running = FALSE
+--   -- Loop starts here
+--   -> State: 1.3 <-
+--   -> Input: 1.4 <-
+--   -> State: 1.4 <-
+--     proc2.state = entering
+--   -> Input: 1.5 <-
+--   -> State: 1.5 <-
+--     semaphore = TRUE
+--     proc2.state = critical
+--   -> Input: 1.6 <-
+--     _process_selector_ = proc1
+--     proc2.running = FALSE
+--     proc1.running = TRUE
+--   -> State: 1.6 <-
+--   -> Input: 1.7 <-
+--     _process_selector_ = proc2
+--     proc2.running = TRUE
+--     proc1.running = FALSE
+--   -> State: 1.7 <-
+--     proc2.state = exiting
+--   -> Input: 1.8 <-
+--   -> State: 1.8 <-
+--     semaphore = FALSE
+--     proc2.state = idle
