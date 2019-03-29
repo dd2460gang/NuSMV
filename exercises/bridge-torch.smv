@@ -2,7 +2,6 @@ MODULE main
 VAR
   location : array 0..3 of boolean;
   traveling: array 0..3 of boolean;
-  --speed: array 0..3 of {1, 2, 5, 10};
   torch: boolean;
   time: 0..100;
 
@@ -21,10 +20,8 @@ ASSIGN
   -- asdhkj sadhkas dsd daskj h
   next (torch) := case
     -- rule: torch can only move if carried
-    --count(traveling[0],traveling[1],traveling[2],traveling[3]) >= 1: TRUE;
-    --location[0] & location[1] & location[2] & location[3]: TRUE;
     traveling[0]: !location[0];
-    traveling[1]: !location[1]; -- gfgd gd fgd
+    traveling[1]: !location[1];
     traveling[2]: !location[2];
     traveling[3]: !location[3];
     TRUE: torch;
@@ -70,4 +67,76 @@ LTLSPEC
          & G(traveling[3] -> (location[3] = torch))
      U (count(location[0], location[1], location[2], location[3]) = 4 &
         time <= 17));
-  --X count(location[0], location[1], location[2], location[3]) = 4;
+
+
+-- specification !(((( G count(traveling[0], traveling[1], traveling[2], traveling[3]) < 3 &  G (traveling[0] -> location[0] = torch)) &  G (traveling[1] -> location[1] = torch)) &  G (traveling[2] -> location[2] = torch)) & (( G (traveling[3] -> location[3] = torch)) U (count(location[0], location[1], location[2], location[3]) = 4 & time <= 17)))  is false
+-- as demonstrated by the following execution sequence
+-- Trace Description: LTL Counterexample
+-- Trace Type: Counterexample
+--   -> State: 1.1 <-
+--     location[0] = FALSE
+--     location[1] = FALSE
+--     location[2] = FALSE
+--     location[3] = FALSE
+--     traveling[0] = FALSE
+--     traveling[1] = FALSE
+--     traveling[2] = FALSE
+--     traveling[3] = FALSE
+--     torch = FALSE
+--     time = 0
+--   -> State: 1.2 <-
+--     traveling[0] = TRUE
+--     traveling[1] = TRUE
+--   -> State: 1.3 <-
+--     location[0] = TRUE
+--     location[1] = TRUE
+--     traveling[0] = FALSE
+--     torch = TRUE
+--     time = 2
+--   -> State: 1.4 <-
+--     location[1] = FALSE
+--     traveling[1] = FALSE
+--     traveling[2] = TRUE
+--     traveling[3] = TRUE
+--     torch = FALSE
+--     time = 4
+--   -> State: 1.5 <-
+--     location[2] = TRUE
+--     location[3] = TRUE
+--     traveling[0] = TRUE
+--     traveling[2] = FALSE
+--     traveling[3] = FALSE
+--     torch = TRUE
+--     time = 14
+--   -> State: 1.6 <-
+--     location[0] = FALSE
+--     traveling[1] = TRUE
+--     torch = FALSE
+--     time = 15
+--   -> State: 1.7 <-
+--     location[0] = TRUE
+--     location[1] = TRUE
+--     torch = TRUE
+--     time = 17
+--   -- Loop starts here
+--   -> State: 1.8 <-
+--     location[0] = FALSE
+--     location[1] = FALSE
+--     traveling[0] = FALSE
+--     traveling[1] = FALSE
+--     torch = FALSE
+--     time = 19
+--   -> State: 1.9 <-
+
+
+--The program found a counterexmaple to the negation of the rules. This means that
+--there exists a solution in which the total time is at most 17 time units.
+--According to the error trace above, the solution looks like this:
+
+-- False          True
+--A,B,C,D
+--C,D              A,B
+--A,C,D            B
+--A                C,D,B
+--A,B              C,D
+--                 A,B,C,D
