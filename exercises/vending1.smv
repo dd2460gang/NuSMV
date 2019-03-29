@@ -16,13 +16,18 @@ ASSIGN
 		    TRUE						: state;
   esac;
 
+  -- Initially 2 snacks in vending machine
   init(n_items) := 2;
+  
+  -- Subtract one from n_items each time item is dispensed
   next(n_items) := case
 	(state = dispense_item) & (n_items > 0): n_items - 1;
 	TRUE: n_items;
   esac;
 
   init (acc_payment) := FALSE;
+  
+  -- Need choice to be TRUE for payment to be accepted and vending machine not empty
   next (acc_payment) := (state = expect_payment & payment & choice & (n_items > 0));
 
 DEFINE
@@ -31,12 +36,20 @@ DEFINE
 LTLSPEC
   G(acc_payment -> F release_item);
 
+-- Number of items should be non-negative
 LTLSPEC
   G( !(n_items < 0));
 
+--if n_items become zero, then payment should never be accepted
 LTLSPEC
   G(((n_items = 0) -> !(F acc_payment)));
   
+  
+ -- What is happening is that acc_payment becomes true, but the model hops to
+ -- state ready - choice is canceled! This needs to be prevented.
+ --
+ -- We need to be more careful with how we handle choice - stricter case condition.
+ --
   
   -- -- specification  G (acc_payment ->  F release_item)  is false
   -- -- as demonstrated by the following execution sequence
