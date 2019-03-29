@@ -5,16 +5,13 @@ ASSIGN
   init(state) := idle;
   
   next(state) := case
-    !active: idle;
+    !active: state;
     state = idle : { idle, entering };
     state = entering & !semaphore : critical;
     state = critical : { critical, exiting };
     state = exiting : idle;
     TRUE : state;
   esac;
-  
---FAIRNESS
---  running
 
 MODULE main
 VAR
@@ -25,18 +22,12 @@ VAR
 ASSIGN
   init(semaphore) := FALSE;
   
-  next(proc1) := case
-    running = 0: next(proc1);
-    TRUE : proc1;
-  esac;
-  
-  next(proc2) := case
-    running = 1: next(proc2);
-    TRUE : proc2;
-  esac;
-  
+  -- TRUE when someone active and entering
+  -- TRUE when someone is in critical
+  -- FALSE on exit
   next(semaphore) := case
-    proc1.state = entering | proc2.state = entering: TRUE;
+    (proc1.active & proc1.state = entering) | (proc2.active & proc2.state = entering): TRUE;
+    ( proc1.state = critical) | ( proc2.state = critical): TRUE;
     proc1.state = exiting | proc2.state = exiting: FALSE;
     TRUE : semaphore;
   esac;
@@ -44,7 +35,22 @@ ASSIGN
   next(running) := case
     TRUE: {1,0};
   esac;
-  
+
+-- So no one is unfair when being in critical
+FAIRNESS
+    proc1.state = critical
+
+FAIRNESS
+    proc2.state = critical
+
+
+-- To be fair when it comes to choosing whom to run
+FAIRNESS
+    running = 1
+    
+FAIRNESS
+    running = 0
+
 SPEC AG !(proc1.state = critical & proc2.state = critical); -- safety
 
 SPEC AG (proc1.state = entering -> AF proc1.state = critical); -- liveness
