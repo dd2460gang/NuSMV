@@ -69,13 +69,14 @@ MODULE Door(door_cmd)
 -- Flag "cleaning" indicates if the airlock itself is being cleaned,
 -- so a "dirty" airlock can again be clean again in the next state.
 
-MODULE Airlock(inner_door, outer_door, inner_buttons, outer_buttons, cleaning)
+MODULE Airlock(inner_door, outer_door, inner_buttons, outer_buttons)
   VAR
     state: { clean, dirty };
     inner_door_cmd : {open, close, nop};
     outer_door_cmd : {open, close, nop};
     reset_inner : boolean;
     reset_outer : boolean;
+    cleaning : boolean;
 
   -- Button is reset only if it is pressed and the door is open.
 
@@ -87,7 +88,7 @@ MODULE Airlock(inner_door, outer_door, inner_buttons, outer_buttons, cleaning)
     outer_door_cmd :=
       case
       --check !reset_outer or not?
-      outer_buttons & outer_door = closed & !inner_buttons & state = clean : open;
+      outer_buttons & outer_door = closed & !inner_buttons & state = clean & !cleaning : open;
       outer_buttons & outer_door = open : close;
       --!outer_buttons : nop;
       TRUE: nop;
@@ -98,7 +99,7 @@ MODULE Airlock(inner_door, outer_door, inner_buttons, outer_buttons, cleaning)
     inner_door_cmd :=
       case
       --!reset_inner or not?
-      inner_buttons & inner_door = closed : open;
+      inner_buttons & inner_door = closed & !cleaning: open;
       inner_buttons & inner_door = open : close;
       --!inner_buttons : nop;
       TRUE: nop;
@@ -114,12 +115,16 @@ MODULE Airlock(inner_door, outer_door, inner_buttons, outer_buttons, cleaning)
         -- Describe when the state becomes "dirty" (or "clean")
       esac;
       
-  -- ASSIGN
-  --   cleaning :=
-  --       case
-  --       state = clean : FALSE;
-  --       inner_door = open : FALSE;
-  --       outer_door = open : FALSE;
+  ASSIGN
+    init(cleaning) := FALSE;
+    next(cleaning) :=
+         case
+             state = clean : FALSE;
+             inner_door = open : FALSE;
+             outer_door = open : FALSE;
+             state = dirty & inner_door = closed & outer_door = closed : TRUE;
+             TRUE : cleaning;
+         esac;
 
 ---------------------------------------------------------------------------
 -- MAIN                                                                  --
@@ -133,10 +138,9 @@ MODULE main
     outer_door   : Door(airlock.outer_door_cmd);
     inner_buttons: Button(airlock.reset_inner);
     outer_buttons: Button(airlock.reset_outer);
-    cleaning     : boolean;
+    --cleaning     : boolean;
     airlock : Airlock(inner_door.status, outer_door.status,
-                inner_buttons.pressed, outer_buttons.pressed,
-		cleaning);
+                inner_buttons.pressed, outer_buttons.pressed);
 
 FAIRNESS
   inner_buttons.pressed;
@@ -144,8 +148,8 @@ FAIRNESS
 FAIRNESS
   outer_buttons.pressed;
 
-FAIRNESS
-  cleaning;
+--FAIRNESS
+  --cleaning;
   
 FAIRNESS
     airlock.outer_door = open;
@@ -241,4 +245,16 @@ FAIRNESS
   -- "cleaning" is false
   LTLSPEC
   G (airlock.state = dirty -> (airlock.state = dirty U (airlock.inner_door = closed & airlock.outer_door = closed & airlock.cleaning)));
+  
 ---------------------------------------------------------------------------
+-- Automated cleanng --
+---------------------------------------------------------------------------
+-- REQ: Cleaning only happens (in the next state) if the airlock is dirty
+LTLSPEC
+G (airlock.cleaning -> Y(airlock.state = dirty));
+LTLSPEC
+G (X (airlock.cleaning) -> (airlock.state = dirty));
+
+-- REQ Cleaning only happens if both doors are closed
+CTLSPEC
+AG (airlock.cleaning -> (airlock.inner_door = closed & airlock.outer_door = closed));
