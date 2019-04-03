@@ -174,7 +174,7 @@ FAIRNESS
   --G (airlock.inner_buttons -> F (airlock.inner_door = open));
   AF (airlock.inner_door = open & airlock.inner_buttons);
   --Test
-  --!EF (airlock.inner_door = open & airlock.inner_buttons);
+  --!AF (airlock.inner_door = open & airlock.inner_buttons);
   CTLSPEC
   --G (X (airlock.outer_door = open) -> airlock.outer_buttons);
   AF (airlock.outer_door = open & airlock.outer_buttons);
@@ -216,9 +216,20 @@ FAIRNESS
 ---------------------------------------------------------------------------
 
   -- REQ: No pressed button can be reset until the door opens.
-
+  LTLSPEC
+  G (airlock.inner_buttons -> (!airlock.reset_inner U airlock.inner_door = open));
+  LTLSPEC
+  G (airlock.outer_buttons -> (!airlock.reset_outer U airlock.outer_door = open));
+  --Test opposite
+  --!G (airlock.outer_buttons -> (!airlock.reset_outer U airlock.outer_door = open));
+  
   -- REQ: A button must be reset as soon as the door opens
-
+  CTLSPEC
+  AG (airlock.inner_door = open -> airlock.reset_inner);
+  CTLSPEC
+  AG (airlock.outer_door = open -> airlock.reset_outer);
+  --Test opposite
+  --!(AG (airlock.inner_door = open -> airlock.reset_inner));
   -- REQ: A dirty airlock remains dirty if one of the doors is open or
   -- "cleaning" is false
 ---------------------------------------------------------------------------
