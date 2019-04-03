@@ -61,7 +61,7 @@ MODULE Door(door_cmd)
 -- inside and outside) to request the door to open.
 -- For simplicity, the input of both buttons is merged.
 -- The airlock also has two states:
---   clean: no hazardous materials in the airlock; prerequisite for the 
+--   clean: no hazardous materials in the airlock; prerequisite for the
 --   outer door to open
 --   dirty: after the inner door has opened
 -- After the hazmat suit of a person coming from inside has been disposed
@@ -86,20 +86,20 @@ MODULE Airlock(inner_door, outer_door, inner_buttons, outer_buttons, cleaning)
   ASSIGN
     outer_door_cmd :=
       case
-      outer_buttons & outer_door = closed & state = clean : open;
+      outer_buttons & outer_door = closed & inner_door = closed & state = clean : open;
       outer_buttons & outer_door = open : close;
       !outer_buttons : nop;
-      TRUE: close;
+      TRUE: nop;
         -- Specify when the door should open or close
       esac;
 
   ASSIGN
     inner_door_cmd :=
       case
-      inner_buttons & inner_door = closed : open;
+      inner_buttons & inner_door = closed & outer_door = closed : open;
       inner_buttons & inner_door = open : close;
       !inner_buttons : nop;
-      TRUE: close;
+      TRUE: nop;
         -- Specify when the door should open or close
       esac;
 
@@ -108,7 +108,7 @@ MODULE Airlock(inner_door, outer_door, inner_buttons, outer_buttons, cleaning)
       case
 	   inner_door = open : dirty;
 	   cleaning : clean;
-     TRUE : clean;
+     TRUE : state;
         -- Describe when the state becomes "dirty" (or "clean")
       esac;
 
@@ -151,32 +151,33 @@ FAIRNESS
 -- REQ: Both doors are never open together
   ! (EF (airlock.inner_door = open) & (airlock.outer_door = open));
 
-  CTLSPEC
+  LTLSPEC
   -- REQ: A door only opens if a button is pressed
-  AG (airlock.inner_door = open -> airlock.inner_buttons);
-  CTLSPEC
-  AG (airlock.outer_door = open -> airlock.outer_buttons);
+  G (X (airlock.inner_door = open) -> airlock.inner_buttons);
+  LTLSPEC
+  G (X (airlock.outer_door = open) -> airlock.outer_buttons);
 
-  CTLSPEC
+  --LTLSPEC
   -- REQ: If both buttons are pressed, the inner door should take precedence
-  AG (airlock.inner_buttons & airlock.outer_buttons) -> (airlock.inner_door = open & airlock.outer_door = closed);
+  --G (X (airlock.inner_door = open & airlock.outer_door = closed & !airlock.reset_inner) -> airlock.inner_buttons & airlock.outer_buttons);
+  --G (airlock.inner_buttons & airlock.outer_buttons & !airlock.reset_inner & !airlock.reset_outer -> X (airlock.inner_door = open & airlock.outer_door = closed & !airlock.reset_inner));
 
-  CTLSPEC
+  --CTLSPEC
   -- REQ: Either door must eventually open (i.e., for either door,
   -- there must eventually occur a state where it is open).
-  EF (airlock.inner_door = open) | (airlock.outer_door = open);
+  --EF (airlock.inner_door = open) | (airlock.outer_door = open);
 
-  CTLSPEC
+  --CTLSPEC
   -- REQ: The state of the airlock is always "dirty" if the inner door is open
-  AG (airlock.inner_door = open) -> (airlock.state = dirty);
+  --AG (airlock.inner_door = open) -> (airlock.state = dirty);
 
   -- REQ: The next state of the airlock is always "dirty" if the inner door is open
   --CTLSPEC
   --AG (airlock.inner_door = open) -> (airlock.next.state = dirty);
 
   -- REQ: The outer door never opens for a dirty airlock
-  CTLSPEC
-  ! EF (airlock.outer_door = open & airlock.state = dirty);
+  --CTLSPEC
+  --! EF (airlock.outer_door = open & airlock.state = dirty);
 
   -- REQ: No button can reach a state where it remains pressed forever.
 
