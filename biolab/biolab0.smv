@@ -86,7 +86,7 @@ MODULE Airlock(inner_door, outer_door, inner_buttons, outer_buttons, cleaning)
   ASSIGN
     outer_door_cmd :=
       case
-      outer_buttons & outer_door = closed & inner_door = closed & state = clean : open;
+      outer_buttons & outer_door = closed & !inner_buttons & !reset_outer & state = clean : open;
       outer_buttons & outer_door = open : close;
       !outer_buttons : nop;
       TRUE: nop;
@@ -96,7 +96,7 @@ MODULE Airlock(inner_door, outer_door, inner_buttons, outer_buttons, cleaning)
   ASSIGN
     inner_door_cmd :=
       case
-      inner_buttons & inner_door = closed & outer_door = closed : open;
+      inner_buttons & inner_door = closed & outer_door = closed & reset_inner : open;
       inner_buttons & inner_door = open : close;
       !inner_buttons : nop;
       TRUE: nop;
@@ -157,10 +157,10 @@ FAIRNESS
   LTLSPEC
   G (X (airlock.outer_door = open) -> airlock.outer_buttons);
 
-  --LTLSPEC
+  CTLSPEC
   -- REQ: If both buttons are pressed, the inner door should take precedence
   --G (X (airlock.inner_door = open & airlock.outer_door = closed & !airlock.reset_inner) -> airlock.inner_buttons & airlock.outer_buttons);
-  --G (airlock.inner_buttons & airlock.outer_buttons & !airlock.reset_inner & !airlock.reset_outer -> X (airlock.inner_door = open & airlock.outer_door = closed & !airlock.reset_inner));
+  AF ((airlock.inner_buttons & airlock.outer_buttons & !airlock.reset_inner & !airlock.reset_outer) ->  (airlock.inner_door = open & airlock.outer_door = closed & !airlock.reset_inner));
 
   --CTLSPEC
   -- REQ: Either door must eventually open (i.e., for either door,
