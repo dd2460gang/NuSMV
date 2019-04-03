@@ -167,7 +167,7 @@ FAIRNESS
   ! (EF (airlock.inner_door = open) & (airlock.outer_door = open));
   --Test
   --(EF (airlock.inner_door = open) & (airlock.outer_door = open));
-  
+    
   -- REQ: A door only opens if a button is pressed
   CTLSPEC
   --G (X (airlock.inner_door = open) -> airlock.inner_buttons);
@@ -178,6 +178,12 @@ FAIRNESS
   CTLSPEC
   --G (X (airlock.outer_door = open) -> airlock.outer_buttons);
   AF (airlock.outer_door = open & airlock.outer_buttons);
+  
+  -- Added REQ: Inner/Outer button eventually pressed
+  CTLSPEC
+  AF (airlock.inner_buttons);
+  CTLSPEC
+  AF (airlock.outer_buttons);
   
   -- REQ: If both buttons are pressed, the inner door should take precedence
   --G (X (airlock.inner_door = open & airlock.outer_door = closed & !airlock.reset_inner) -> airlock.inner_buttons & airlock.outer_buttons);
@@ -230,6 +236,9 @@ FAIRNESS
   AG (airlock.outer_door = open -> airlock.reset_outer);
   --Test opposite
   --!(AG (airlock.inner_door = open -> airlock.reset_inner));
+  
   -- REQ: A dirty airlock remains dirty if one of the doors is open or
   -- "cleaning" is false
+  LTLSPEC
+  G (airlock.state = dirty -> (airlock.state = dirty U (airlock.inner_door = closed & airlock.outer_door = closed & airlock.cleaning)));
 ---------------------------------------------------------------------------
