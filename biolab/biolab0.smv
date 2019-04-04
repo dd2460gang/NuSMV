@@ -148,7 +148,8 @@ FAIRNESS
   cleaning;
   
 FAIRNESS
-    airlock.outer_door = open;
+    --airlock.outer_door = open;
+    inner_buttons.pressed & outer_buttons.pressed;
 
 --FAIRNESS
     --airlock.reset_inner;
