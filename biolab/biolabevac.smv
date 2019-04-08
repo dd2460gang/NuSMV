@@ -224,7 +224,7 @@ DEFINE
   LTLSPEC
   G((airlock.inner_buttons & airlock.outer_buttons & !inner_open & !outer_open & airlock.access = normal) -> (inner_cmd_open & !(outer_cmd_open)));
 
-  --REQ: (Evac) If both inside buttons are pressed in evac-mode, the inside door should take precedence.
+  --REQ: (Evac 7) If both inside buttons are pressed in evac-mode, the inside door should take precedence.
   LTLSPEC
   G((airlock.inner_buttons_i & airlock.outer_buttons_i & !inner_open & !outer_open & airlock.access = evac) -> (inner_cmd_open & !(outer_cmd_open)));
 
@@ -277,7 +277,7 @@ DEFINE
   --Test opposite
   --!G (airlock.outer_buttons -> (!airlock.reset_outer U airlock.outer_door = open));
 
-  --REQ: (Evac) A request from a pressed button remains active until the door opens or access is restricted.
+  --REQ: (Evac 8) A request from a pressed button remains active until the door opens or access is restricted.
   LTLSPEC
   G (airlock.inner_buttons_i -> (airlock.inner_buttons_i U (inner_open | airlock.access = evac)));
   LTLSPEC
@@ -315,7 +315,7 @@ DEFINE
 ---------------------------------------------------------------------------
 -- Evac --
 ---------------------------------------------------------------------------
--- REQ: In evac-mode doors only listens to inside buttons (_i)
+-- REQ: (Evac 9) In evac-mode doors only listens to inside buttons (_i)
 --(The doors never open on a push of an outside button as long as the mode of the airlock is evac)
   LTLSPEC
   G  !(airlock.access = evac & inner_cmd_open & airlock.inner_buttons_o & !airlock.inner_buttons_i);
