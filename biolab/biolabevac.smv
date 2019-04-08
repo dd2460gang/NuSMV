@@ -88,7 +88,8 @@ MODULE Airlock(inner_door, outer_door, inner_buttons_i, inner_buttons_o, outer_b
     outer_door_cmd :=
       case
         --reset_outer : nop;
-        outer_door = closed & inner_door = closed & !(inner_door_cmd = open) & outer_buttons & !(state = dirty) : open;
+        outer_door = closed & inner_door = closed & !(inner_door_cmd = open) & outer_buttons & !(state = dirty) & access = normal : open;
+        outer_door = closed & inner_door = closed & !(inner_door_cmd = open) & outer_buttons_i & !(state = dirty) & access = evac : open;
         outer_door = open & inner_door_cmd = open : close;
         TRUE: nop;
         -- Specify when the door should open or close
@@ -99,8 +100,11 @@ MODULE Airlock(inner_door, outer_door, inner_buttons_i, inner_buttons_o, outer_b
       case
         -- Specify when the door should open or close
         --reset_inner : nop;
-        inner_buttons & inner_door = closed  : open;
-        inner_door = open & outer_buttons : close;
+        inner_buttons & inner_door = closed & access = normal  : open;
+        inner_buttons_i & inner_door = closed & access = evac  : open;
+        inner_door = open & outer_buttons & access = normal: close;
+        inner_door = open & outer_buttons_i & access = evac: close;
+
         TRUE: nop;
 
   esac;
@@ -230,7 +234,7 @@ DEFINE
   G (airlock.outer_buttons -> (!airlock.reset_outer U airlock.outer_door = open));
   --Test opposite
   --!G (airlock.outer_buttons -> (!airlock.reset_outer U airlock.outer_door = open));
-  
+
   -- REQ: A button must be reset as soon as the door opens
   LTLSPEC
   G (airlock.inner_door_cmd = open -> F(airlock.inner_door = open & airlock.reset_inner));
@@ -238,12 +242,12 @@ DEFINE
   G (airlock.outer_door = open -> F(airlock.outer_door = open & airlock.reset_outer));
   --Test opposite
   --!(AG (airlock.inner_door = open -> airlock.reset_inner));
-  
+
   -- REQ: A dirty airlock remains dirty if one of the doors is open or
   -- "cleaning" is false
   LTLSPEC
   G (airlock.state = dirty -> (airlock.state = dirty U (airlock.inner_door = closed & airlock.outer_door = closed & airlock.cleaning)));
-  
+
 ---------------------------------------------------------------------------
 -- Automated cleanng --
 ---------------------------------------------------------------------------
