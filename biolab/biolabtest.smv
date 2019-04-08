@@ -112,6 +112,17 @@ MODULE Airlock(inner_door, outer_door, inner_buttons, outer_buttons, cleaning)
         -- Describe when the state becomes "dirty" (or "clean")
       esac;
 
+ -- ASSIGN
+      --init(cleaning) := FALSE;
+     -- next(cleaning) :=
+           --case
+           --    state = clean : FALSE;
+         --      inner_door = open : FALSE;
+       --        outer_door = open : FALSE;
+     --          state = dirty & inner_door = closed & outer_door = closed : TRUE;
+   --            TRUE : cleaning;
+ -- esac;
+
 ---------------------------------------------------------------------------
 -- MAIN                                                                  --
 ---------------------------------------------------------------------------
@@ -206,9 +217,35 @@ DEFINE
 ---------------------------------------------------------------------------
 
   -- REQ: No pressed button can be reset until the door opens.
-
+  LTLSPEC
+  G (airlock.inner_buttons -> (!airlock.reset_inner U airlock.inner_door = open));
+  LTLSPEC
+  G (airlock.outer_buttons -> (!airlock.reset_outer U airlock.outer_door = open));
+  --Test opposite
+  --!G (airlock.outer_buttons -> (!airlock.reset_outer U airlock.outer_door = open));
+  
   -- REQ: A button must be reset as soon as the door opens
-
+  LTLSPEC
+  G (airlock.inner_door_cmd = open -> F(airlock.inner_door = open & airlock.reset_inner));
+  LTLSPEC
+  G (airlock.outer_door = open -> F(airlock.outer_door = open & airlock.reset_outer));
+  --Test opposite
+  --!(AG (airlock.inner_door = open -> airlock.reset_inner));
+  
   -- REQ: A dirty airlock remains dirty if one of the doors is open or
   -- "cleaning" is false
+  LTLSPEC
+  G (airlock.state = dirty -> (airlock.state = dirty U (airlock.inner_door = closed & airlock.outer_door = closed & airlock.cleaning)));
+  
 ---------------------------------------------------------------------------
+-- Automated cleanng --
+---------------------------------------------------------------------------
+-- REQ: Cleaning only happens (in the next state) if the airlock is dirty
+--LTLSPEC
+--G (airlock.cleaning -> Y(airlock.state = dirty));
+--LTLSPEC
+--G (X (airlock.cleaning) -> (airlock.state = dirty));
+
+-- REQ Cleaning only happens if both doors are closed
+--CTLSPEC
+--AG (airlock.cleaning -> (airlock.inner_door = closed & airlock.outer_door = closed));

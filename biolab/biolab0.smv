@@ -173,9 +173,14 @@ FAIRNESS
 DEFINE
     outer_open := (airlock.outer_door = open);
     inner_open := (airlock.inner_door = open);
+
     inner_cmd_open := (airlock.inner_door_cmd = open);
     inner_cmd_close := (airlock.inner_door_cmd = close);
+    inner_cmd_nop := (airlock.inner_door_cmd = nop);
+    
     outer_cmd_open := (airlock.outer_door_cmd = open);
+    outer_cmd_close := (airlock.outer_door_cmd = close);
+    outer_cmd_nop := (airlock.outer_door_cmd = nop);
 
 
 
