@@ -1,0 +1,356 @@
+---------------------------------------------------------------------------
+-- BUTTON                                                                --
+---------------------------------------------------------------------------
+
+-- For each door there is a button to request service, that can be
+-- pressed. A pressed button stays pressed unless reset by the
+-- controller. A button that is not pressed can become pressed
+-- nondeterministically.
+
+MODULE Button(reset)
+  VAR
+    pressed : boolean;
+  ASSIGN
+    init(pressed) := FALSE;
+    next(pressed) :=
+      case
+        pressed & reset  : FALSE;
+        pressed & !reset : TRUE;
+        !pressed         : {FALSE,TRUE};
+      esac;
+
+  -- REQ: The controller must not reset a button that is not pressed.
+  --INVARSPEC (reset -> pressed)
+
+---------------------------------------------------------------------------
+-- DOOR                                                                  --
+---------------------------------------------------------------------------
+
+-- Each airlock (entrance) is equipped with a set of double doors.
+-- Each door can receive either open, close or nop commands
+-- from the controller, and it responds opening, closing, or
+-- preserving the current state.
+
+MODULE Door(door_cmd)
+  VAR
+    status : { open, closed };
+
+  ASSIGN
+    init(status) := closed;
+    next(status) :=
+      case
+        door_cmd = open      : open;
+        door_cmd = close     : closed;
+        door_cmd = nop       : status;
+      esac;
+
+  -- REQ: The controller can issue an open command only if the door is closed.
+  INVARSPEC (door_cmd = open  -> status = closed)
+
+  -- REQ: The controller can issue a close command only if the door is open.
+  INVARSPEC (door_cmd = close -> status = open)
+
+
+
+---------------------------------------------------------------------------
+-- AIRLOCK                                                            --
+---------------------------------------------------------------------------
+
+-- The airlock has an inner and outer door, and a pair of buttons (on the
+-- inside and outside) to request the door to open.
+-- For simplicity, the input of both buttons is merged.
+-- The airlock also has two states:
+--   clean: no hazardous materials in the airlock; prerequisite for the
+--   outer door to open
+--   dirty: after the inner door has opened
+-- After the hazmat suit of a person coming from inside has been disposed
+-- of, and the air has been cleaned, a dirty airlock is clean again.
+-- Flag "cleaning" indicates if the airlock itself is being cleaned,
+-- so a "dirty" airlock can again be clean again in the next state.
+
+MODULE Airlock(inner_door, outer_door, inner_buttons_i, inner_buttons_o, outer_buttons_i, outer_buttons_o)
+  VAR
+    state: { clean, dirty };
+    access: { normal, evac, lockdown };
+    inner_door_cmd : {open, close, nop};
+    outer_door_cmd : {open, close, nop};
+    reset_inner_i : boolean;
+    reset_inner_o : boolean;
+    reset_outer_i : boolean;
+    reset_outer_o : boolean;
+    cleaning : boolean;
+
+  -- Button is reset only if it is pressed and the door is open.
+
+  ASSIGN
+    reset_inner_i := (inner_buttons_i & inner_door = open);
+    reset_outer_o := (outer_buttons_o & outer_door = open);
+  ASSIGN
+    reset_inner_o := 
+      case
+      (inner_buttons_o & inner_door = open) : TRUE;
+      state = evac : TRUE;
+      TRUE: FALSE;
+      esac;
+  ASSIGN
+      reset_outer_i := 
+      case
+        (outer_buttons_i & outer_door = open) : TRUE;
+        state = evac : TRUE;
+        TRUE: FALSE;
+      esac;
+    
+    
+
+  ASSIGN
+    outer_door_cmd :=
+      case
+        --reset_outer : nop;
+        outer_door = closed & inner_door = closed & !(inner_door_cmd = open) & outer_buttons & !(state = dirty) & access = normal : open;
+        outer_door = closed & inner_door = closed & !(inner_door_cmd = open) & outer_buttons_i & !(state = dirty) & access = evac : open;
+        outer_door = open & inner_door_cmd = open : close;
+        outer_door = open & access = lockdown : close;
+        TRUE: nop;
+        -- Specify when the door should open or close
+      esac;
+
+  ASSIGN
+    inner_door_cmd :=
+      case
+        -- Specify when the door should open or close
+        --reset_inner : nop;
+        inner_buttons & inner_door = closed & access = normal  : open;
+        inner_buttons_i & inner_door = closed & access = evac  : open;
+        inner_door = open & outer_buttons & access = normal: close;
+        inner_door = open & outer_buttons_i & access = evac: close;
+        inner_door = open & access = lockdown : close;
+        TRUE: nop;
+
+      esac;
+
+  ASSIGN
+    next (state) :=
+      case
+        inner_door_cmd = open : dirty;
+        cleaning & inner_door = closed & outer_door = closed & !(outer_door_cmd = open) & !(inner_door_cmd = open): clean;
+        TRUE: state;
+        -- Describe when the state becomes "dirty" (or "clean")
+      esac;
+
+  ASSIGN
+      init(cleaning) := FALSE;
+      next(cleaning) :=
+        case
+             state = clean : FALSE;
+             inner_door_cmd = open : FALSE;
+             outer_door_cmd = open : FALSE;
+             state = dirty & inner_door = closed & outer_door = closed : TRUE;
+             TRUE : cleaning;
+        esac;
+
+  ASSIGN
+    init(access) := normal;
+    next(access) :=
+      case
+      access = normal : {normal, evac};
+      access = evac : {normal, evac, lockdown};
+      access = lockdown : {normal, lockdown};
+      esac;
+
+  DEFINE
+    inner_buttons := (inner_buttons_i|inner_buttons_o);
+    outer_buttons := (outer_buttons_i|outer_buttons_o);
+
+
+---------------------------------------------------------------------------
+-- MAIN                                                                  --
+---------------------------------------------------------------------------
+
+-- The main module shows the connection between modules.
+
+MODULE main
+  VAR
+    inner_door   : Door(airlock.inner_door_cmd);
+    outer_door   : Door(airlock.outer_door_cmd);
+    inner_buttons_i: Button(airlock.reset_inner_i);
+    inner_buttons_o: Button(airlock.reset_inner_o);
+    outer_buttons_i: Button(airlock.reset_outer_i);
+    outer_buttons_o: Button(airlock.reset_outer_o);
+    --cleaning     : boolean;
+    airlock : Airlock(inner_door.status, outer_door.status,
+                inner_buttons_i.pressed, inner_buttons_o.pressed, outer_buttons_i.pressed, outer_buttons_o.pressed);
+
+FAIRNESS
+  inner_buttons_i.pressed;
+
+--FAIRNESS
+  --inner_buttons_o.pressed;
+
+--FAIRNESS
+  --outer_buttons_o.pressed;
+
+FAIRNESS
+  outer_buttons_i.pressed;
+
+--FAIRNESS
+  --cleaning;
+
+FAIRNESS
+      !inner_buttons_i.pressed & outer_buttons_i.pressed;
+
+FAIRNESS
+      inner_buttons_i.pressed & !outer_buttons_i.pressed;
+
+DEFINE
+    outer_open := (airlock.outer_door = open);
+    outer_closed := (airlock.outer_door = closed);
+    inner_open := (airlock.inner_door = open);
+    inner_closed := (airlock.inner_door = closed);
+
+    inner_cmd_open := (airlock.inner_door_cmd = open);
+    inner_cmd_close := (airlock.inner_door_cmd = close);
+    outer_cmd_open := (airlock.outer_door_cmd = open);
+    outer_cmd_close := (airlock.outer_door_cmd = close);
+
+-- FAIRNESS
+  -- Add another fairness property if needed
+
+---------------------------------------------------------------------------
+-- REQUIREMENTS                                                          --
+---------------------------------------------------------------------------
+
+  -- The airlock controller must satisfy the following requirements.
+
+  -- REQ: Both doors are never open together
+  LTLSPEC
+  G (! ((inner_open) & (outer_open)));
+
+  -- REQ: A door only opens if a button is pressed
+  LTLSPEC
+  G ((inner_open) -> O airlock.inner_buttons);
+  LTLSPEC
+  G ((outer_open) -> O airlock.outer_buttons);
+
+  -- REQ: If both buttons are pressed, the inner door should take precedence
+  LTLSPEC
+  G((airlock.inner_buttons & airlock.outer_buttons & !inner_open & !outer_open & airlock.access = normal) -> (inner_cmd_open & !(outer_cmd_open)));
+
+  --REQ: (Evac 7) If both inside buttons are pressed in evac-mode, the inside door should take precedence.
+  LTLSPEC
+  G((airlock.inner_buttons_i & airlock.outer_buttons_i & !inner_open & !outer_open & airlock.access = evac) -> (inner_cmd_open & !(outer_cmd_open)));
+
+  CTLSPEC
+  AF (airlock.inner_buttons);
+  CTLSPEC
+  AF (airlock.outer_buttons);
+
+  -- REQ: Either door must eventually open (i.e., for either door,
+  -- there must eventually occur a state where it is open).
+  CTLSPEC
+  AF (inner_open);
+  CTLSPEC
+  AF (outer_open);
+
+  -- REQ: The state of the airlock is always "dirty" if the inner door is open
+  CTLSPEC
+  AG (inner_open) -> (airlock.state = dirty);
+
+  -- REQ: The next state of the airlock is always "dirty" if the inner door is open
+  LTLSPEC
+  G ((inner_open) -> X (airlock.state = dirty));
+
+  -- REQ: The outer door never opens for a dirty airlock
+  CTLSPEC
+  ! EF (outer_open & airlock.state = dirty);
+
+  -- REQ: No button can reach a state where it remains pressed forever.
+  CTLSPEC
+  ! (EF EG(airlock.inner_buttons_i));
+  CTLSPEC
+  ! (EF EG(airlock.inner_buttons_o));
+  CTLSPEC
+  ! (EF EG (airlock.outer_buttons_i));
+  CTLSPEC
+  ! (EF EG (airlock.outer_buttons_o));
+---------------------------------------------------------------------------
+-- Advanced properties for higher grades --
+---------------------------------------------------------------------------
+
+  -- REQ: No pressed button can be reset until the door opens.
+  LTLSPEC
+  G (airlock.inner_buttons_i -> (!airlock.reset_inner_i U inner_open));
+  LTLSPEC
+  G (airlock.inner_buttons_o -> (!airlock.reset_inner_o U inner_open));
+  LTLSPEC
+  G (airlock.outer_buttons_i -> (!airlock.reset_outer_i U outer_open));
+  LTLSPEC
+  G (airlock.outer_buttons_o -> (!airlock.reset_outer_o U outer_open));
+  --Test opposite
+  --!G (airlock.outer_buttons -> (!airlock.reset_outer U airlock.outer_door = open));
+
+  --REQ: (Evac 8) A request from a pressed button remains active until the door opens or access is restricted.
+  LTLSPEC
+  G (airlock.inner_buttons_i -> (airlock.inner_buttons_i U (inner_open | airlock.access = evac)));
+  LTLSPEC
+  G (airlock.inner_buttons_o -> (airlock.inner_buttons_o U inner_open | airlock.access = evac));
+  LTLSPEC
+  G (airlock.outer_buttons_i -> (airlock.outer_buttons_i U outer_open | airlock.access = evac));
+  LTLSPEC
+  G (airlock.outer_buttons_o -> (airlock.outer_buttons_o U outer_open | airlock.access = evac));
+
+  -- REQ: A button must be reset as soon as the door opens
+  LTLSPEC
+  G (inner_cmd_open -> F(inner_open & (airlock.reset_inner_i | airlock.reset_inner_o)));
+  LTLSPEC
+  G (outer_open -> F(outer_open & (airlock.reset_outer_i | airlock.reset_outer_o)));
+  --Test opposite
+  --!(AG (airlock.inner_door = open -> airlock.reset_inner));
+
+  -- REQ: A dirty airlock remains dirty if one of the doors is open or
+  -- "cleaning" is false
+  LTLSPEC
+  G (airlock.state = dirty -> (airlock.state = dirty U (inner_closed & outer_closed & airlock.cleaning)));
+
+---------------------------------------------------------------------------
+-- Automated cleanng --
+---------------------------------------------------------------------------
+-- REQ: Cleaning only happens (in the next state) if the airlock is dirty
+--LTLSPEC
+--G (airlock.cleaning -> Y(airlock.state = dirty));
+  LTLSPEC
+  G (X (airlock.cleaning) -> (airlock.state = dirty));
+
+  -- REQ Cleaning only happens if both doors are closed
+  CTLSPEC
+  AG (airlock.cleaning -> (inner_closed & outer_closed));
+---------------------------------------------------------------------------
+-- Evac --
+---------------------------------------------------------------------------
+-- REQ: (Evac 9) In evac-mode doors only listens to inside buttons (_i)
+--(The doors never open on a push of an outside button as long as the mode of the airlock is evac)
+  LTLSPEC
+  G  !(airlock.access = evac & inner_cmd_open & airlock.inner_buttons_o & !airlock.inner_buttons_i);
+  LTLSPEC
+  G  !(airlock.access = evac & outer_cmd_open & airlock.outer_buttons_o & !airlock.outer_buttons_i);
+---------------------------------------------------------------------------
+-- Lockdown --
+---------------------------------------------------------------------------
+--REQ (Lock 1) cannot transition directly from normal to lockdown mode
+  LTLSPEC
+  G(airlock.access = lockdown -> Y!(airlock.access = normal));
+  LTLSPEC
+  G((airlock.access = lockdown) -> O (airlock.access = evac));
+
+  --HALP! REQ (Lock 2) The door never opens on a push of an outside btn as long as the mode is in evac or lockdown
+  LTLSPEC
+  G(((airlock.access = lockdown | airlock.access = evac) & airlock.outer_buttons_o & !airlock.outer_buttons_i) -> X(outer_closed U airlock.access = normal));
+
+  --REQ (Lock 3) The doors never open in lockdown
+  LTLSPEC
+  G!(airlock.access = lockdown & inner_cmd_open);
+   LTLSPEC
+  G!(airlock.access = lockdown & outer_cmd_open);
+
+  --REQ The doors close when entering lockdown and remain closed during lockdown
+  LTLSPEC
+  G(airlock.access = lockdown -> X(inner_closed & outer_closed) U !(airlock.access = lockdown)); 
