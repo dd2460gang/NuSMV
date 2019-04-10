@@ -253,7 +253,7 @@ DEFINE
 
   -- REQ: The state of the airlock is always "dirty" if the inner door is open
   CTLSPEC
-  AG (inner_open) -> (airlock.state = dirty);
+  AG ((inner_open) -> (airlock.state = dirty));
 
   -- REQ: The next state of the airlock is always "dirty" if the inner door is open
   LTLSPEC
@@ -344,9 +344,14 @@ DEFINE
   --HALP! REQ (Lock 2) The door never opens on a push of an outside btn as long as the mode is in evac or lockdown
   --G(((airlock.access = lockdown | airlock.access = evac) & airlock.outer_buttons_o & !airlock.outer_buttons_i) -> X(outer_closed U airlock.access = normal));
   LTLSPEC
-    G( (outer_closed & airlock.access = lockdown ) -> (outer_closed U !(airlock.access = lockdown)))
-    LTLSPEC
-    G( (outer_closed & airlock.access = evac ) -> (outer_closed U (airlock.outer_buttons_i | !(airlock.access = evac))))
+  G  !(airlock.access = lockdown & inner_cmd_open);
+  LTLSPEC
+  G  !(airlock.access = lockdown & outer_cmd_open);
+
+  --LTLSPEC
+  --G( (outer_closed & airlock.access = lockdown ) -> (outer_closed U !(airlock.access = lockdown)))
+  --LTLSPEC
+  --G( (outer_closed & airlock.access = evac ) -> (outer_closed U (airlock.outer_buttons_i | !(airlock.access = evac))))
 
   --REQ (Lock 3) The doors never open in lockdown
   LTLSPEC
