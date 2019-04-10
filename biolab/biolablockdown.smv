@@ -86,21 +86,21 @@ MODULE Airlock(inner_door, outer_door, inner_buttons_i, inner_buttons_o, outer_b
     reset_inner_i := (inner_buttons_i & inner_door = open);
     reset_outer_o := (outer_buttons_o & outer_door = open);
   ASSIGN
-    reset_inner_o := 
+    reset_inner_o :=
       case
       (inner_buttons_o & inner_door = open) : TRUE;
       state = evac : TRUE;
       TRUE: FALSE;
       esac;
   ASSIGN
-      reset_outer_i := 
+      reset_outer_i :=
       case
         (outer_buttons_i & outer_door = open) : TRUE;
         state = evac : TRUE;
         TRUE: FALSE;
       esac;
-    
-    
+
+
 
   ASSIGN
     outer_door_cmd :=
@@ -342,8 +342,11 @@ DEFINE
   G((airlock.access = lockdown) -> O (airlock.access = evac));
 
   --HALP! REQ (Lock 2) The door never opens on a push of an outside btn as long as the mode is in evac or lockdown
+  --G(((airlock.access = lockdown | airlock.access = evac) & airlock.outer_buttons_o & !airlock.outer_buttons_i) -> X(outer_closed U airlock.access = normal));
   LTLSPEC
-  G(((airlock.access = lockdown | airlock.access = evac) & airlock.outer_buttons_o & !airlock.outer_buttons_i) -> X(outer_closed U airlock.access = normal));
+    G( (outer_closed & airlock.access = lockdown ) -> (outer_closed U !(airlock.access = lockdown)))
+    LTLSPEC
+    G( (outer_closed & airlock.access = evac ) -> (outer_closed U (airlock.outer_buttons_i | !(airlock.access = evac))))
 
   --REQ (Lock 3) The doors never open in lockdown
   LTLSPEC
@@ -353,4 +356,4 @@ DEFINE
 
   --REQ The doors close when entering lockdown and remain closed during lockdown
   LTLSPEC
-  G(airlock.access = lockdown -> X(inner_closed & outer_closed) U !(airlock.access = lockdown)); 
+  G(airlock.access = lockdown -> X(inner_closed & outer_closed) U !(airlock.access = lockdown));
