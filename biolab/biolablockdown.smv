@@ -285,8 +285,6 @@ DEFINE
   G (airlock.outer_buttons_i -> (!airlock.reset_outer_i U outer_open));
   LTLSPEC
   G (airlock.outer_buttons_o -> (!airlock.reset_outer_o U outer_open));
-  --Test opposite
-  --!G (airlock.outer_buttons -> (!airlock.reset_outer U airlock.outer_door = open));
 
   --REQ: (Evac 8) A request from a pressed button remains active until the door opens or access is restricted.
   LTLSPEC
@@ -303,8 +301,6 @@ DEFINE
   G (inner_cmd_open -> F(inner_open & (airlock.reset_inner_i | airlock.reset_inner_o)));
   LTLSPEC
   G (outer_open -> F(outer_open & (airlock.reset_outer_i | airlock.reset_outer_o)));
-  --Test opposite
-  --!(AG (airlock.inner_door = open -> airlock.reset_inner));
 
   -- REQ: A dirty airlock remains dirty if one of the doors is open or
   -- "cleaning" is false
@@ -341,17 +337,10 @@ DEFINE
   LTLSPEC
   G((airlock.access = lockdown) -> O (airlock.access = evac));
 
-  --HALP! REQ (Lock 2) The door never opens on a push of an outside btn as long as the mode is in evac or lockdown
-  --G(((airlock.access = lockdown | airlock.access = evac) & airlock.outer_buttons_o & !airlock.outer_buttons_i) -> X(outer_closed U airlock.access = normal));
   LTLSPEC
   G  !(airlock.access = lockdown & inner_cmd_open);
   LTLSPEC
   G  !(airlock.access = lockdown & outer_cmd_open);
-
-  --LTLSPEC
-  --G( (outer_closed & airlock.access = lockdown ) -> (outer_closed U !(airlock.access = lockdown)))
-  --LTLSPEC
-  --G( (outer_closed & airlock.access = evac ) -> (outer_closed U (airlock.outer_buttons_i | !(airlock.access = evac))))
 
   --REQ (Lock 3) The doors never open in lockdown
   LTLSPEC
@@ -362,3 +351,248 @@ DEFINE
   --REQ The doors close when entering lockdown and remain closed during lockdown
   LTLSPEC
   G(airlock.access = lockdown -> X(inner_closed & outer_closed) U !(airlock.access = lockdown));
+
+
+  -- This is an error trace for a faulty model of the base solution
+  -- It failed on REQ: Either door must eventually open. This was
+  -- solved by updating our model with an additional fairness
+  -- property.
+  -- -- specification AF airlock.outer_door = open  is false
+  -- -- as demonstrated by the following execution sequence
+  -- Trace Description: CTL Counterexample
+  -- Trace Type: Counterexample
+  --
+  -- -> State: 1.1 <-
+  -- This is the initial state where both doors are closed
+  -- and the airlock is clean
+  --   inner_door.status = closed
+  --   outer_door.status = closed
+  --   inner_buttons.pressed = FALSE
+  --   outer_buttons.pressed = FALSE
+  --   cleaning = FALSE
+  --   airlock.state = clean
+  --   airlock.inner_door_cmd = nop
+  --   airlock.outer_door_cmd = nop
+  --   airlock.reset_inner = FALSE
+  --   airlock.reset_outer = FALSE
+  --   outer_cmd_open = FALSE
+  --   inner_cmd_close = FALSE
+  --   inner_cmd_open = FALSE
+  --   inner_open = FALSE
+  --   outer_open = FALSE
+  --
+  -- -> State: 1.2 <-
+  -- The inner button is pressed
+  -- which makes the controller send an
+  -- open command.
+  --   inner_buttons.pressed = TRUE
+  --   cleaning = TRUE
+  --   airlock.inner_door_cmd = open
+  --   inner_cmd_open = TRUE
+  --
+  -- -> State: 1.3 <-
+  -- The inner door opens, which causes the
+  -- airlock to become dirty. At the same time, the outer button
+  -- gets pressed and the airlock sends a command to close the inner
+  -- door.
+  --   inner_door.status = open
+  --   outer_buttons.pressed = TRUE
+  --   cleaning = FALSE
+  --   airlock.state = dirty
+  --   airlock.inner_door_cmd = close
+  --   airlock.reset_inner = TRUE
+  --   inner_cmd_close = TRUE
+  --   inner_cmd_open = FALSE
+  --   inner_open = TRUE
+  --
+  -- -- Loop starts here
+  -- -> State: 1.4 <-
+  -- The inner door closes but the outer door is not
+  -- opened since the airlock is dirty.
+  --   inner_door.status = closed
+  --   inner_buttons.pressed = FALSE
+  --   airlock.inner_door_cmd = nop
+  --   airlock.reset_inner = FALSE
+  --   inner_cmd_close = FALSE
+  --   inner_open = FALSE
+  --
+  -- -> State: 1.5 <-
+  -- For state 1.5 - 1.7 The inner door
+  -- keeps opening and closing. The outer
+  -- door never gets a chance to open either because
+  -- the inner door has precedence or the dirty remains.
+  -- inner_buttons.pressed = TRUE
+  -- cleaning = TRUE
+  -- airlock.inner_door_cmd = open
+  -- inner_cmd_open = TRUE
+  -- -> State: 1.6 <-
+  -- inner_door.status = open
+  -- cleaning = FALSE
+  -- airlock.inner_door_cmd = close
+  -- airlock.reset_inner = TRUE
+  -- inner_cmd_close = TRUE
+  -- inner_cmd_open = FALSE
+  -- inner_open = TRUE
+  -- -> State: 1.7 <-
+  -- inner_door.status = closed
+  -- inner_buttons.pressed = FALSE
+  -- airlock.inner_door_cmd = nop
+  -- airlock.reset_inner = FALSE
+  -- inner_cmd_close = FALSE
+  -- inner_open = FALSE
+  --
+  --
+  --
+  --
+  -- This is an error trace for a mutated property from the base solution.
+  -- We have negated REQ: Both doors are never open together.
+  -- -- specification  G !(!(airlock.inner_door = open & airlock.outer_door = open))  is false
+  -- -- as demonstrated by the following execution sequence
+  -- Trace Description: LTL Counterexample
+  -- Trace Type: Counterexample
+  --   -> State: 1.1 <-
+  --   This is the initial state where both doors are closed
+  --   and the airlock is clean
+  --     inner_door.status = closed
+  --     outer_door.status = closed
+  --     inner_buttons.pressed = FALSE
+  --     outer_buttons.pressed = FALSE
+  --     cleaning = FALSE
+  --     airlock.state = clean
+  --     airlock.inner_door_cmd = nop
+  --     airlock.outer_door_cmd = nop
+  --     airlock.reset_inner = FALSE
+  --     airlock.reset_outer = FALSE
+  --     outer_cmd_open = FALSE
+  --     inner_cmd_close = FALSE
+  --     inner_cmd_open = FALSE
+  --     inner_open = FALSE
+  --     outer_open = FALSE
+  --   -> State: 1.2 <-
+  --   The inner button is pressed which sets
+  --   the inner door command to open.
+  --     inner_buttons.pressed = TRUE
+  --     airlock.inner_door_cmd = open
+  --     inner_cmd_open = TRUE
+  --   -- Loop starts here
+  --   -> State: 1.3 <-
+  --   The inner door is now open which causes
+  --   the airlock to become dirty. The outer button
+  --   gets pressed. Since the doors can't be open simultaneously,
+  --   an inner door close command is sent when the outer button is
+  --   pressed.
+  --     inner_door.status = open
+  --     outer_buttons.pressed = TRUE
+  --     airlock.state = dirty
+  --     airlock.inner_door_cmd = close
+  --     airlock.reset_inner = TRUE
+  --     inner_cmd_close = TRUE
+  --     inner_cmd_open = FALSE
+  --     inner_open = TRUE
+  --   -> State: 1.4 <-
+  --   The inner door closes. The outer door cannot
+  --   open yet since the airlock is still dirty.
+  --   Cleaning is initiated in this state.
+  --     inner_door.status = closed
+  --     inner_buttons.pressed = FALSE
+  --     cleaning = TRUE
+  --     airlock.inner_door_cmd = nop
+  --     airlock.reset_inner = FALSE
+  --     inner_cmd_close = FALSE
+  --     inner_open = FALSE
+  --   -> State: 1.5 <-
+  --   Once the airlock is clean, the outer door gets
+  --   a command to open.
+  --     cleaning = FALSE
+  --     airlock.state = clean
+  --     airlock.outer_door_cmd = open
+  --     outer_cmd_open = TRUE
+  --   -> State: 1.6 <-
+  --   The outer door opens, the outer button gets ready to reset.
+  --     outer_door.status = open
+  --     airlock.outer_door_cmd = nop
+  --     airlock.reset_outer = TRUE
+  --     outer_cmd_open = FALSE
+  --     outer_open = TRUE
+  --   -> State: 1.7 <-
+  --   The inner button is pressed and therefore the outer door
+  --   gets a close command since the doors can't be open
+  --   simultaneously. The inner door get an open command.
+  --     inner_buttons.pressed = TRUE
+  --     outer_buttons.pressed = FALSE
+  --     airlock.inner_door_cmd = open
+  --     airlock.outer_door_cmd = close
+  --     airlock.reset_outer = FALSE
+  --     inner_cmd_open = TRUE
+  --   -- Loop starts here
+  --   -> State: 1.8 <-
+  --   The inner door is now open which causes
+  --   the airlock to become dirty. The outer button
+  --   gets pressed. Since the doors can't be open simultaneously,
+  --   an inner door close command is sent when the outer button is
+  --   pressed.
+  --     inner_door.status = open
+  --     outer_door.status = closed
+  --     outer_buttons.pressed = TRUE
+  --     airlock.state = dirty
+  --     airlock.inner_door_cmd = close
+  --     airlock.outer_door_cmd = nop
+  --     airlock.reset_inner = TRUE
+  --     inner_cmd_close = TRUE
+  --     inner_cmd_open = FALSE
+  --     inner_open = TRUE
+  --     outer_open = FALSE
+  --   -> State: 1.9 <-
+  --   The inner door closes. The outer door cannot
+  --   open yet since the airlock is still dirty.
+  --   Cleaning is initiated in this state.
+  --     inner_door.status = closed
+  --     inner_buttons.pressed = FALSE
+  --     cleaning = TRUE
+  --     airlock.inner_door_cmd = nop
+  --     airlock.reset_inner = FALSE
+  --     inner_cmd_close = FALSE
+  --     inner_open = FALSE
+  --   -> State: 1.10 <-
+  --   Once the airlock is clean, the outer door gets
+  --   a command to open.
+  --     cleaning = FALSE
+  --     airlock.state = clean
+  --     airlock.outer_door_cmd = open
+  --     outer_cmd_open = TRUE
+  --   -> State: 1.11 <-
+  --   The outer door opens, the outer button gets ready to reset.
+  --     outer_door.status = open
+  --     airlock.outer_door_cmd = nop
+  --     airlock.reset_outer = TRUE
+  --     outer_cmd_open = FALSE
+  --     outer_open = TRUE
+  --   -> State: 1.12 <-
+  --   The inner button is pressed and therefore the outer door
+  --   gets a close command since the doors can't be open
+  --   simultaneously. The inner door gets an open command.
+  --     inner_buttons.pressed = TRUE
+  --     outer_buttons.pressed = FALSE
+  --     airlock.inner_door_cmd = open
+  --     airlock.outer_door_cmd = close
+  --     airlock.reset_outer = FALSE
+  --     inner_cmd_open = TRUE
+  --   -> State: 1.13 <-
+  --   The inner door is now open which causes
+  --   the airlock to become dirty. The outer button
+  --   gets pressed. Since the doors can't be open simultaneously,
+  --   an inner door close command is sent when the outer button is
+  --   pressed.
+  --     inner_door.status = open
+  --     outer_door.status = closed
+  --     outer_buttons.pressed = TRUE
+  --     airlock.state = dirty
+  --     airlock.inner_door_cmd = close
+  --     airlock.outer_door_cmd = nop
+  --     airlock.reset_inner = TRUE
+  --     inner_cmd_close = TRUE
+  --     inner_cmd_open = FALSE
+  --     inner_open = TRUE
+  --     outer_open = FALSE
+  -- In conclusion, this error trace shows that the doors are never open at the
+  -- same time.
